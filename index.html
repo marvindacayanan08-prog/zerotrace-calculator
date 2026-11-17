@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+
+    <!-- =====================================================================
+         CUSTOM TOAST NOTIFICATION SYSTEM (Replaces alert/confirm)
+         ===================================================================== -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- =====================================================================
+         CUSTOM CONFIRMATION MODAL
+         ===================================================================== -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 transition-opacity">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex items-center gap-3 text-amber-400 mb-3">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                <h3 id="confirm-title" class="text-lg font-semibold text-white">Confirm Action</h3>
+            </div>
+            <p id="confirm-message" class="text-slate-300 text-sm mb-6 leading-relaxed">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-cancel-btn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button id="confirm-ok-btn" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition-colors shadow-lg shadow-rose-950/50">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         VIEW 1: STEALTH CALCULATOR INTERFACE
+         ===================================================================== -->
+    <main id="calculator-view" class="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 w-full max-w-lg mx-auto transition-all duration-300">
+        
+        <!-- Subtle Status / First-Time Setup Banner -->
+        <div id="setup-banner" class="w-full mb-4 bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <p id="setup-banner-title" class="text-xs font-semibold text-indigo-300">First-Time Vault Setup</p>
+                    <p id="setup-banner-desc" class="text-xs text-slate-400">Type a 4–6 digit PIN & press <span class="font-mono text-indigo-400 font-bold">=</span> to create your vault.</p>
+                </div>
+            </div>
+            <button id="dismiss-banner-btn" class="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors" title="Dismiss hint">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Calculator Chassis -->
+        <div class="w-full bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-6 shadow-2xl shadow-black/60">
+            
+            <!-- Top Bar: Mode Switcher & Subtle Lock Indicator -->
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+                    <button id="mode-standard-btn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white transition-all">
+                        Standard
+                    </button>
+                    <button id="mode-scientific-btn" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all">
+                        Scientific
+                    </button>
+                </div>
+                <button id="pin-help-btn" class="text-slate-500 hover:text-slate-300 p-2 rounded-xl transition-colors" title="Calculator Info">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Display Screen -->
+            <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 sm:p-5 mb-5 flex flex-col justify-end items-end min-h-[115px] relative overflow-hidden">
+                <!-- History / Expression line -->
+                <div id="calc-expression" class="text-slate-400 font-mono text-sm sm:text-base h-6 overflow-x-auto whitespace-nowrap max-w-full scrollbar-none"></div>
+                <!-- Main Current Number / Result -->
+                <div id="calc-display" class="text-white font-mono text-3xl sm:text-4xl font-semibold tracking-tight mt-1 overflow-x-auto whitespace-nowrap max-w-full">0</div>
+            </div>
+
+            <!-- Scientific Keypad (Collapsible) -->
+            <div id="scientific-keys" class="hidden grid-cols-4 gap-2.5 mb-2.5">
+                <button data-sci="sin" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">sin</button>
+                <button data-sci="cos" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">cos</button>
+                <button data-sci="tan" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">tan</button>
+                <button data-sci="sqrt" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">√</button>
+                
+                <button data-sci="log" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">log</button>
+                <button data-sci="ln" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">ln</button>
+                <button data-sci="pow2" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">x²</button>
+                <button data-sci="pi" class="calc-btn-sci p-3 rounded-2xl bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-sm font-medium transition-all border border-slate-800/60">π</button>
+            </div>
+
+            <!-- Standard Keypad Grid -->
+            <div class="grid grid-cols-4 gap-2.5 sm:gap-3">
+                <!-- Row 1 -->
+                <button data-action="clear" class="p-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-rose-400 font-semibold text-lg transition-all">AC</button>
+                <button data-action="backspace" class="p-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-200 font-semibold text-lg flex items-center justify-center transition-all" aria-label="Backspace">
+                    <i data-lucide="delete" class="w-5 h-5"></i>
+                </button>
+                <button data-action="percent" class="p-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-indigo-400 font-semibold text-lg transition-all">%</button>
+                <button data-operator="/" class="p-4 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 text-indigo-400 font-semibold text-xl transition-all">÷</button>
+
+                <!-- Row 2 -->
+                <button data-digit="7" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">7</button>
+                <button data-digit="8" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">8</button>
+                <button data-digit="9" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">9</button>
+                <button data-operator="*" class="p-4 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 text-indigo-400 font-semibold text-xl transition-all">×</button>
+
+                <!-- Row 3 -->
+                <button data-digit="4" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">4</button>
+                <button data-digit="5" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">5</button>
+                <button data-digit="6" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">6</button>
+                <button data-operator="-" class="p-4 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 text-indigo-400 font-semibold text-xl transition-all">−</button>
+
+                <!-- Row 4 -->
+                <button data-digit="1" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">1</button>
+                <button data-digit="2" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">2</button>
+                <button data-digit="3" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">3</button>
+                <button data-operator="+" class="p-4 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 text-indigo-400 font-semibold text-xl transition-all">+</button>
+
+                <!-- Row 5 -->
+                <button data-action="negate" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-slate-300 font-mono text-lg font-medium transition-all border border-slate-800/50">±</button>
+                <button data-digit="0" class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">0</button>
+                <button data-digit="." class="p-4 rounded-2xl bg-slate-800/40 hover:bg-slate-800 active:scale-95 text-white font-mono text-xl font-medium transition-all border border-slate-800/50">.</button>
+                <button data-action="equals" class="p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xl transition-all shadow-lg shadow-indigo-950/60">=</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- =====================================================================
+         VIEW 2: HIDDEN PRIVATE MEDIA & FILE VAULT
+         ===================================================================== -->
+    <section id="vault-view" class="hidden flex-1 flex-col w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Vault Top Header -->
+        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-inner">
+                    <i data-lucide="lock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">Private Vault</h1>
+                        <span class="px-2 py-0.5 text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">Local IndexedDB</span>
+                    </div>
+                    <p id="vault-stats" class="text-xs sm:text-sm text-slate-400 mt-0.5">0 items stored • 0 MB used</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2.5 self-start sm:self-auto">
+                <button id="change-pin-btn" class="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs sm:text-sm font-medium flex items-center gap-2 transition-colors">
+                    <i data-lucide="key-round" class="w-4 h-4 text-slate-400"></i>
+                    <span>Change PIN</span>
+                </button>
+                <button id="quick-lock-btn" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-rose-950/40 active:scale-95">
+                    <i data-lucide="eye-off" class="w-4 h-4"></i>
+                    <span>Quick Lock</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Upload Dropzone -->
+        <div id="dropzone" class="mt-6 border-2 border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl p-6 sm:p-8 text-center transition-all cursor-pointer group">
+            <input type="file" id="file-input" multiple class="hidden" accept="*/*">
+            <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-indigo-500/20 text-slate-400 group-hover:text-indigo-400 flex items-center justify-center mx-auto mb-3 transition-colors">
+                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-sm sm:text-base font-semibold text-slate-200">Click to upload or drag & drop files here</h3>
+            <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto">Supports Images, Videos, Audio, PDFs, and Documents. Stored privately in your browser's local database.</p>
+        </div>
+
+        <!-- Category Tabs & Search Toolbar -->
+        <div class="mt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <!-- Category Filter Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                <button data-tab="all" class="vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-indigo-600 text-white transition-all whitespace-nowrap">
+                    All <span id="count-all" class="ml-1 opacity-75 text-xs">(0)</span>
+                </button>
+                <button data-tab="image" class="vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800/80 transition-all whitespace-nowrap flex items-center gap-1.5">
+                    <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                    Images <span id="count-image" class="opacity-75 text-xs">(0)</span>
+                </button>
+                <button data-tab="video" class="vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800/80 transition-all whitespace-nowrap flex items-center gap-1.5">
+                    <i data-lucide="video" class="w-3.5 h-3.5"></i>
+                    Videos <span id="count-video" class="opacity-75 text-xs">(0)</span>
+                </button>
+                <button data-tab="file" class="vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800/80 transition-all whitespace-nowrap flex items-center gap-1.5">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                    Files <span id="count-file" class="opacity-75 text-xs">(0)</span>
+                </button>
+            </div>
+
+            <!-- Search Input -->
+            <div class="relative w-full md:w-72">
+                <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="vault-search" placeholder="Search stored items..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-sm text-slate-200 placeholder-slate-500 transition-colors">
+            </div>
+        </div>
+
+        <!-- Vault Items Grid -->
+        <div id="vault-grid" class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Dynamically populated cards -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="vault-empty" class="hidden flex-col items-center justify-center py-16 px-4 text-center border border-slate-800/60 rounded-2xl bg-slate-900/20 mt-6">
+            <div class="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                <i data-lucide="folder-open" class="w-7 h-7"></i>
+            </div>
+            <h4 class="text-base font-medium text-slate-300">No items found</h4>
+            <p class="text-xs text-slate-500 mt-1 max-w-xs">Upload photos, videos, or sensitive documents above to keep them hidden behind your calculator.</p>
+        </div>
+    </section>
+
+    <!-- =====================================================================
+         MEDIA VIEWER / PREVIEW MODAL
+         ===================================================================== -->
+    <div id="media-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/90">
+                <div class="min-w-0 pr-4">
+                    <h3 id="modal-file-name" class="text-sm sm:text-base font-semibold text-white truncate">filename.ext</h3>
+                    <p id="modal-file-meta" class="text-xs text-slate-400">Size • Date</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="modal-download-btn" class="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors" title="Download File">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Download</span>
+                    </button>
+                    <button id="modal-close-btn" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors" title="Close Preview">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Content Area -->
+            <div id="modal-content" class="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center bg-slate-950 min-h-[300px]">
+                <!-- Dynamic preview injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         APPLICATION LOGIC (IndexedDB + Calculator Engine + Vault Manager)
+         ===================================================================== -->
+    <script>
+        /**
+         * Stealth Calculator Vault
+         * Uses IndexedDB ('StealthVaultDB') to persist binary file blobs and metadata locally.
+         * Uses localStorage ('vault_pin_hash') to store the user's secret 4-6 digit PIN.
+         */
+
+        // --- State Variables ---
+        const DB_NAME = 'StealthVaultDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'vault_items';
+        const PIN_STORAGE_KEY = 'stealth_calc_vault_pin';
+
+        let db = null;
+        let currentTab = 'all';
+        let searchQuery = '';
+        let activeObjectURLs = []; // Track object URLs to prevent memory leaks
+        let currentPreviewItem = null;
+
+        // PIN Setup / Reset State
+        let pinSetupMode = false; // true when creating a new PIN or resetting PIN
+        let pinConfirmStep = false;
+        let tempNewPin = '';
+
+        // Calculator State
+        let calcState = {
+            currentInput: '0',
+            previousInput: '',
+            operator: null,
+            shouldResetScreen: false,
+            rawDigitBuffer: '' // Tracks pure consecutive digits typed for PIN verification
+        };
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            initPinState();
+            setupCalculatorListeners();
+            setupVaultListeners();
+            
+            try {
+                db = await openDatabase();
+            } catch (err) {
+                showToast('Storage Error: Could not initialize local IndexedDB.', 'error');
+                console.error(err);
+            }
+        });
+
+        // =====================================================================
+        // 1. PIN AUTHENTICATION & SETUP FLOW
+        // =====================================================================
+        function initPinState() {
+            const savedPin = localStorage.getItem(PIN_STORAGE_KEY);
+            const banner = document.getElementById('setup-banner');
+            const title = document.getElementById('setup-banner-title');
+            const desc = document.getElementById('setup-banner-desc');
+
+            if (!savedPin) {
+                pinSetupMode = true;
+                pinConfirmStep = false;
+                banner.classList.remove('hidden');
+                title.textContent = 'First-Time Vault Setup';
+                desc.innerHTML = 'Enter a 4–6 digit PIN & press <span class="font-mono text-indigo-400 font-bold">=</span> to set your secret key.';
+            } else {
+                pinSetupMode = false;
+                banner.classList.add('hidden');
+            }
+        }
+
+        function startPinResetFlow() {
+            lockVault();
+            pinSetupMode = true;
+            pinConfirmStep = false;
+            tempNewPin = '';
+            const banner = document.getElementById('setup-banner');
+            const title = document.getElementById('setup-banner-title');
+            const desc = document.getElementById('setup-banner-desc');
+            
+            banner.classList.remove('hidden');
+            title.textContent = 'Set New Vault PIN';
+            desc.innerHTML = 'Type your new 4–6 digit PIN & press <span class="font-mono text-indigo-400 font-bold">=</span>.';
+            showToast('Enter your new 4-6 digit PIN on the calculator and press =', 'info');
+        }
+
+        function handlePinCheckOnEquals(typedSequence) {
+            // Only evaluate pure 4-to-6 digit sequences without math operators
+            const isValidPinFormat = /^\d{4,6}$/.test(typedSequence);
+            const savedPin = localStorage.getItem(PIN_STORAGE_KEY);
+
+            // CASE A: First-time setup or PIN reset
+            if (pinSetupMode) {
+                if (!isValidPinFormat) {
+                    showToast('PIN must be 4 to 6 digits long (numbers only).', 'warning');
+                    return false;
+                }
+
+                if (!pinConfirmStep) {
+                    tempNewPin = typedSequence;
+                    pinConfirmStep = true;
+                    document.getElementById('setup-banner-title').textContent = 'Confirm Your PIN';
+                    document.getElementById('setup-banner-desc').innerHTML = 'Re-enter the same PIN & press <span class="font-mono text-indigo-400 font-bold">=</span> to confirm.';
+                    resetCalculator();
+                    showToast('Re-enter PIN and press = to confirm', 'info');
+                    return true;
+                } else {
+                    if (typedSequence === tempNewPin) {
+                        localStorage.setItem(PIN_STORAGE_KEY, typedSequence);
+                        pinSetupMode = false;
+                        pinConfirmStep = false;
+                        tempNewPin = '';
+                        document.getElementById('setup-banner').classList.add('hidden');
+                        resetCalculator();
+                        showToast('Vault PIN saved! Unlocking vault...', 'success');
+                        unlockVault();
+                        return true;
+                    } else {
+                        pinConfirmStep = false;
+                        tempNewPin = '';
+                        document.getElementById('setup-banner-title').textContent = 'PINs Did Not Match';
+                        document.getElementById('setup-banner-desc').innerHTML = 'Enter a 4–6 digit PIN & press <span class="font-mono text-indigo-400 font-bold">=</span> to try again.';
+                        resetCalculator();
+                        showToast('PINs did not match. Please start over.', 'error');
+                        return true;
+                    }
+                }
+            }
+
+            // CASE B: Normal Unlock Check
+            if (savedPin && typedSequence === savedPin) {
+                resetCalculator();
+                unlockVault();
+                return true;
+            }
+
+            return false;
+        }
+
+        function unlockVault() {
+            document.getElementById('calculator-view').classList.add('hidden');
+            const vaultView = document.getElementById('vault-view');
+            vaultView.classList.remove('hidden');
+            vaultView.classList.add('flex');
+            renderVaultItems();
+        }
+
+        function lockVault() {
+            // Revoke all active blob URLs for security & memory cleanup
+            revokeAllObjectURLs();
+            closeMediaModal();
+            resetCalculator();
+
+            const vaultView = document.getElementById('vault-view');
+            vaultView.classList.add('hidden');
+            vaultView.classList.remove('flex');
+            document.getElementById('calculator-view').classList.remove('hidden');
+        }
+
+        // =====================================================================
+        // 2. CALCULATOR ENGINE
+        // =====================================================================
+        function setupCalculatorListeners() {
+            const displayEl = document.getElementById('calc-display');
+            const exprEl = document.getElementById('calc-expression');
+
+            // Mode switching (Standard vs Scientific)
+            const stdBtn = document.getElementById('mode-standard-btn');
+            const sciBtn = document.getElementById('mode-scientific-btn');
+            const sciKeys = document.getElementById('scientific-keys');
+
+            stdBtn.addEventListener('click', () => {
+                stdBtn.classList.add('bg-slate-800', 'text-white');
+                stdBtn.classList.remove('text-slate-400');
+                sciBtn.classList.remove('bg-slate-800', 'text-white');
+                sciBtn.classList.add('text-slate-400');
+                sciKeys.classList.add('hidden');
+                sciKeys.classList.remove('grid');
+            });
+
+            sciBtn.addEventListener('click', () => {
+                sciBtn.classList.add('bg-slate-800', 'text-white');
+                sciBtn.classList.remove('text-slate-400');
+                stdBtn.classList.remove('bg-slate-800', 'text-white');
+                stdBtn.classList.add('text-slate-400');
+                sciKeys.classList.remove('hidden');
+                sciKeys.classList.add('grid');
+            });
+
+            // Dismiss hint banner
+            document.getElementById('dismiss-banner-btn').addEventListener('click', () => {
+                document.getElementById('setup-banner').classList.add('hidden');
+            });
+
+            // Info button shows subtle hint
+            document.getElementById('pin-help-btn').addEventListener('click', () => {
+                const hasPin = !!localStorage.getItem(PIN_STORAGE_KEY);
+                if (hasPin) {
+                    showToast('Standard & Scientific Calculator. Enter your secret PIN + "=" to access private storage.', 'info');
+                } else {
+                    document.getElementById('setup-banner').classList.remove('hidden');
+                }
+            });
+
+            // Digit buttons
+            document.querySelectorAll('[data-digit]').forEach(btn => {
+                btn.addEventListener('click', () => appendDigit(btn.dataset.digit));
+            });
+
+            // Operator buttons
+            document.querySelectorAll('[data-operator]').forEach(btn => {
+                btn.addEventListener('click', () => chooseOperator(btn.dataset.operator));
+            });
+
+            // Scientific buttons
+            document.querySelectorAll('[data-sci]').forEach(btn => {
+                btn.addEventListener('click', () => handleScientific(btn.dataset.sci));
+            });
+
+            // Action buttons
+            document.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.dataset.action;
+                    if (action === 'clear') resetCalculator();
+                    if (action === 'backspace') deleteLastDigit();
+                    if (action === 'percent') applyPercent();
+                    if (action === 'negate') toggleSign();
+                    if (action === 'equals') evaluateCalculation();
+                });
+            });
+
+            // Keyboard support when calculator is visible
+            document.addEventListener('keydown', (e) => {
+                if (document.getElementById('calculator-view').classList.contains('hidden')) return;
+                if (e.key >= '0' && e.key <= '9') appendDigit(e.key);
+                if (e.key === '.') appendDigit('.');
+                if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') chooseOperator(e.key);
+                if (e.key === 'Enter' || e.key === '=') {
+                    e.preventDefault();
+                    evaluateCalculation();
+                }
+                if (e.key === 'Backspace') deleteLastDigit();
+                if (e.key === 'Escape') resetCalculator();
+            });
+        }
+
+        function updateCalcDisplay() {
+            const displayEl = document.getElementById('calc-display');
+            const exprEl = document.getElementById('calc-expression');
+            displayEl.textContent = calcState.currentInput;
+            
+            const opSymbols = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+            if (calcState.operator && calcState.previousInput !== '') {
+                exprEl.textContent = `${calcState.previousInput} ${opSymbols[calcState.operator] || calcState.operator}`;
+            } else {
+                exprEl.textContent = '';
+            }
+        }
+
+        function appendDigit(digit) {
+            if (calcState.shouldResetScreen) {
+                calcState.currentInput = digit === '.' ? '0.' : digit;
+                calcState.shouldResetScreen = false;
+                calcState.rawDigitBuffer = digit === '.' ? '' : digit;
+            } else {
+                if (digit === '.' && calcState.currentInput.includes('.')) return;
+                if (calcState.currentInput === '0' && digit !== '.') {
+                    calcState.currentInput = digit;
+                    calcState.rawDigitBuffer = digit;
+                } else {
+                    if (calcState.currentInput.length >= 16) return;
+                    calcState.currentInput += digit;
+                    if (digit !== '.' && !calcState.operator) {
+                        calcState.rawDigitBuffer += digit;
+                    } else {
+                        calcState.rawDigitBuffer = '';
+                    }
+                }
+            }
+            updateCalcDisplay();
+        }
+
+        function chooseOperator(op) {
+            calcState.rawDigitBuffer = ''; // Math operation invalidates pure PIN sequence
+            if (calcState.operator !== null && !calcState.shouldResetScreen) {
+                computeMath();
+            }
+            calcState.previousInput = calcState.currentInput;
+            calcState.operator = op;
+            calcState.shouldResetScreen = true;
+            updateCalcDisplay();
+        }
+
+        function computeMath() {
+            const prev = parseFloat(calcState.previousInput);
+            const current = parseFloat(calcState.currentInput);
+            if (isNaN(prev) || isNaN(current)) return;
+
+            let result = 0;
+            switch (calcState.operator) {
+                case '+': result = prev + current; break;
+                case '-': result = prev - current; break;
+                case '*': result = prev * current; break;
+                case '/':
+                    if (current === 0) {
+                        calcState.currentInput = 'Error';
+                        calcState.previousInput = '';
+                        calcState.operator = null;
+                        calcState.shouldResetScreen = true;
+                        updateCalcDisplay();
+                        return;
+                    }
+                    result = prev / current;
+                    break;
+            }
+            // Fix floating point precision issues
+            calcState.currentInput = String(Math.round(result * 1e10) / 1e10);
+            calcState.operator = null;
+            calcState.previousInput = '';
+        }
+
+        function evaluateCalculation() {
+            // 1. Check if the entered sequence is a PIN setup or unlock attempt
+            const candidatePin = calcState.rawDigitBuffer;
+            if (!calcState.operator && candidatePin.length > 0) {
+                const handledAsPin = handlePinCheckOnEquals(candidatePin);
+                if (handledAsPin) return;
+            }
+
+            // 2. Otherwise perform normal calculation
+            if (calcState.operator === null) return;
+            computeMath();
+            calcState.shouldResetScreen = true;
+            calcState.rawDigitBuffer = '';
+            updateCalcDisplay();
+        }
+
+        function handleScientific(fn) {
+            calcState.rawDigitBuffer = '';
+            let val = parseFloat(calcState.currentInput);
+            if (isNaN(val)) return;
+
+            let res = val;
+            switch (fn) {
+                case 'sin': res = Math.sin(val * Math.PI / 180); break;
+                case 'cos': res = Math.cos(val * Math.PI / 180); break;
+                case 'tan': res = Math.tan(val * Math.PI / 180); break;
+                case 'sqrt': res = val < 0 ? NaN : Math.sqrt(val); break;
+                case 'log': res = val <= 0 ? NaN : Math.log10(val); break;
+                case 'ln': res = val <= 0 ? NaN : Math.log(val); break;
+                case 'pow2': res = Math.pow(val, 2); break;
+                case 'pi': res = Math.PI; break;
+            }
+
+            calcState.currentInput = isNaN(res) ? 'Error' : String(Math.round(res * 1e10) / 1e10);
+            calcState.shouldResetScreen = true;
+            updateCalcDisplay();
+        }
+
+        function applyPercent() {
+            calcState.rawDigitBuffer = '';
+            const val = parseFloat(calcState.currentInput);
+            if (isNaN(val)) return;
+            calcState.currentInput = String(val / 100);
+            updateCalcDisplay();
+        }
+
+        function toggleSign() {
+            calcState.rawDigitBuffer = '';
+            if (calcState.currentInput === '0' || calcState.currentInput === 'Error') return;
+            calcState.currentInput = calcState.currentInput.startsWith('-')
+                ? calcState.currentInput.slice(1)
+                : '-' + calcState.currentInput;
+            updateCalcDisplay();
+        }
+
+        function deleteLastDigit() {
+            if (calcState.shouldResetScreen || calcState.currentInput === 'Error') {
+                resetCalculator();
+                return;
+            }
+            calcState.currentInput = calcState.currentInput.length > 1
+                ? calcState.currentInput.slice(0, -1)
+                : '0';
+            calcState.rawDigitBuffer = calcState.rawDigitBuffer.slice(0, -1);
+            updateCalcDisplay();
+        }
+
+        function resetCalculator() {
+            calcState = {
+                currentInput: '0',
+                previousInput: '',
+                operator: null,
+                shouldResetScreen: false,
+                rawDigitBuffer: ''
+            };
+            updateCalcDisplay();
+        }
+
+        // =====================================================================
+        // 3. INDEXEDDB STORAGE LAYER
+        // =====================================================================
+        function openDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = (event) => {
+                    const database = event.target.result;
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        const store = database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('category', 'category', { unique: false });
+                        store.createIndex('createdAt', 'createdAt', { unique: false });
+                    }
+                };
+
+                request.onsuccess = (event) => resolve(event.target.result);
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        function addFileToDB(file) {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject('Database not initialized');
+                
+                let category = 'file';
+                if (file.type.startsWith('image/')) category = 'image';
+                else if (file.type.startsWith('video/')) category = 'video';
+
+                const record = {
+                    name: file.name,
+                    type: file.type || 'application/octet-stream',
+                    size: file.size,
+                    category: category,
+                    createdAt: Date.now(),
+                    blob: file // File inherits from Blob and stores natively in IndexedDB
+                };
+
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.add(record);
+
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function getAllFilesFromDB() {
+            return new Promise((resolve, reject) => {
+                if (!db) return resolve([]);
+                const tx = db.transaction([STORE_NAME], 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.getAll();
+
+                req.onsuccess = () => {
+                    // Sort newest first
+                    const items = req.result || [];
+                    items.sort((a, b) => b.createdAt - a.createdAt);
+                    resolve(items);
+                };
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function deleteFileFromDB(id) {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject('Database not initialized');
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.delete(id);
+
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // =====================================================================
+        // 4. VAULT UI & FILE OPERATIONS
+        // =====================================================================
+        function setupVaultListeners() {
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('file-input');
+
+            // Quick Lock & Change PIN
+            document.getElementById('quick-lock-btn').addEventListener('click', lockVault);
+            document.getElementById('change-pin-btn').addEventListener('click', startPinResetFlow);
+
+            // Upload triggers
+            dropzone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleFilesUpload(e.target.files));
+
+            // Drag and drop events
+            ['dragenter', 'dragover'].forEach(evt => {
+                dropzone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('border-indigo-500', 'bg-slate-900');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(evt => {
+                dropzone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('border-indigo-500', 'bg-slate-900');
+                });
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                    handleFilesUpload(e.dataTransfer.files);
+                }
+            });
+
+            // Category Tabs
+            document.querySelectorAll('.vault-tab').forEach(tabBtn => {
+                tabBtn.addEventListener('click', () => {
+                    currentTab = tabBtn.dataset.tab;
+                    updateTabStyles();
+                    renderVaultItems();
+                });
+            });
+
+            // Search Bar
+            document.getElementById('vault-search').addEventListener('input', (e) => {
+                searchQuery = e.target.value.trim().toLowerCase();
+                renderVaultItems();
+            });
+
+            // Media Modal Close & Download
+            document.getElementById('modal-close-btn').addEventListener('click', closeMediaModal);
+            document.getElementById('media-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'media-modal') closeMediaModal();
+            });
+            document.getElementById('modal-download-btn').addEventListener('click', () => {
+                if (currentPreviewItem) downloadVaultItem(currentPreviewItem);
+            });
+        }
+
+        async function handleFilesUpload(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            const files = Array.from(fileList);
+            let successCount = 0;
+
+            for (const file of files) {
+                try {
+                    await addFileToDB(file);
+                    successCount++;
+                } catch (err) {
+                    console.error('Upload error:', err);
+                    showToast(`Failed to save "${file.name}"`, 'error');
+                }
+            }
+
+            // Clear input so the same file can be uploaded again if needed
+            document.getElementById('file-input').value = '';
+
+            if (successCount > 0) {
+                showToast(`Encrypted & stored ${successCount} item${successCount > 1 ? 's' : ''} in vault.`, 'success');
+                renderVaultItems();
+            }
+        }
+
+        function updateTabStyles() {
+            document.querySelectorAll('.vault-tab').forEach(btn => {
+                if (btn.dataset.tab === currentTab) {
+                    btn.className = 'vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-indigo-600 text-white transition-all whitespace-nowrap flex items-center gap-1.5';
+                } else {
+                    btn.className = 'vault-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800/80 transition-all whitespace-nowrap flex items-center gap-1.5';
+                }
+            });
+        }
+
+        function revokeAllObjectURLs() {
+            activeObjectURLs.forEach(url => URL.revokeObjectURL(url));
+            activeObjectURLs = [];
+        }
+
+        async function renderVaultItems() {
+            revokeAllObjectURLs();
+            const allItems = await getAllFilesFromDB();
+
+            // Update counts and total size
+            const imageCount = allItems.filter(i => i.category === 'image').length;
+            const videoCount = allItems.filter(i => i.category === 'video').length;
+            const fileCount = allItems.filter(i => i.category === 'file').length;
+            const totalBytes = allItems.reduce((sum, item) => sum + (item.size || 0), 0);
+
+            document.getElementById('count-all').textContent = `(${allItems.length})`;
+            document.getElementById('count-image').textContent = `(${imageCount})`;
+            document.getElementById('count-video').textContent = `(${videoCount})`;
+            document.getElementById('count-file').textContent = `(${fileCount})`;
+            document.getElementById('vault-stats').textContent = `${allItems.length} item${allItems.length !== 1 ? 's' : ''} stored • ${formatBytes(totalBytes)} used`;
+
+            // Filter by tab and search query
+            const filtered = allItems.filter(item => {
+                const matchesTab = currentTab === 'all' || item.category === currentTab;
+                const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery);
+                return matchesTab && matchesSearch;
+            });
+
+            const grid = document.getElementById('vault-grid');
+            const emptyState = document.getElementById('vault-empty');
+            grid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                grid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
+
+            filtered.forEach(item => {
+                const card = createVaultCard(item);
+                grid.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        function createVaultCard(item) {
+            const card = document.createElement('div');
+            card.className = 'group bg-slate-900 border border-slate-800/90 hover:border-slate-700 rounded-2xl overflow-hidden flex flex-col transition-all shadow-lg';
+
+            // Thumbnail Area
+            const thumbWrapper = document.createElement('div');
+            thumbWrapper.className = 'relative h-44 bg-slate-950 flex items-center justify-center overflow-hidden cursor-pointer';
+            thumbWrapper.addEventListener('click', () => openMediaModal(item));
+
+            if (item.category === 'image') {
+                const url = URL.createObjectURL(item.blob);
+                activeObjectURLs.push(url);
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = item.name;
+                img.className = 'w-full h-full object-cover group-hover:scale-105 transition-transform duration-300';
+                thumbWrapper.appendChild(img);
+            } else if (item.category === 'video') {
+                const url = URL.createObjectURL(item.blob);
+                activeObjectURLs.push(url);
+                const video = document.createElement('video');
+                video.src = url;
+                video.muted = true;
+                video.preload = 'metadata';
+                video.className = 'w-full h-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-300';
+                
+                const playBadge = document.createElement('div');
+                playBadge.className = 'absolute inset-0 flex items-center justify-center bg-black/30';
+                playBadge.innerHTML = `<div class="w-11 h-11 rounded-full bg-indigo-600/90 text-white flex items-center justify-center shadow-lg"><i data-lucide="play" class="w-5 h-5 fill-current ml-0.5"></i></div>`;
+                
+                thumbWrapper.appendChild(video);
+                thumbWrapper.appendChild(playBadge);
+            } else {
+                // Document / Audio / Generic File icon
+                const iconName = getFileIconName(item.type, item.name);
+                const ext = item.name.split('.').pop().toUpperCase().slice(0, 5);
+                thumbWrapper.innerHTML = `
+                    <div class="flex flex-col items-center justify-center text-slate-400 group-hover:text-indigo-400 transition-colors">
+                        <i data-lucide="${iconName}" class="w-12 h-12 mb-2"></i>
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-semibold bg-slate-900 border border-slate-800 rounded-md text-slate-300">${escapeHTML(ext || 'FILE')}</span>
+                    </div>
+                `;
+            }
+
+            // Category Badge
+            const badge = document.createElement('span');
+            badge.className = 'absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-slate-950/80 text-slate-300 backdrop-blur-sm border border-slate-800/80';
+            badge.textContent = item.category;
+            thumbWrapper.appendChild(badge);
+
+            // Card Body & Footer Actions
+            const body = document.createElement('div');
+            body.className = 'p-3.5 flex-1 flex flex-col justify-between';
+
+            const info = document.createElement('div');
+            info.className = 'mb-3';
+            info.innerHTML = `
+                <h4 class="text-sm font-medium text-slate-200 truncate" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</h4>
+                <p class="text-xs text-slate-500 mt-0.5">${formatBytes(item.size)} • ${new Date(item.createdAt).toLocaleDateString()}</p>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'flex items-center justify-between gap-2 pt-2.5 border-t border-slate-800/80';
+
+            const previewBtn = document.createElement('button');
+            previewBtn.className = 'flex-1 py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors';
+            previewBtn.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i><span>Open</span>`;
+            previewBtn.addEventListener('click', () => openMediaModal(item));
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'p-1.5 rounded-lg bg-slate-800/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition-colors';
+            downloadBtn.title = 'Download';
+            downloadBtn.innerHTML = `<i data-lucide="download" class="w-3.5 h-3.5"></i>`;
+            downloadBtn.addEventListener('click', () => downloadVaultItem(item));
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors';
+            deleteBtn.title = 'Delete permanently';
+            deleteBtn.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>`;
+            deleteBtn.addEventListener('click', () => {
+                showConfirmDialog(
+                    'Delete Item',
+                    `Are you sure you want to permanently delete "${item.name}" from your vault?`,
+                    async () => {
+                        await deleteFileFromDB(item.id);
+                        showToast('Item deleted permanently.', 'info');
+                        renderVaultItems();
+                    }
+                );
+            });
+
+            actions.appendChild(previewBtn);
+            actions.appendChild(downloadBtn);
+            actions.appendChild(deleteBtn);
+
+            body.appendChild(info);
+            body.appendChild(actions);
+
+            card.appendChild(thumbWrapper);
+            card.appendChild(body);
+            return card;
+        }
+
+        function openMediaModal(item) {
+            currentPreviewItem = item;
+            const modal = document.getElementById('media-modal');
+            const content = document.getElementById('modal-content');
+            document.getElementById('modal-file-name').textContent = item.name;
+            document.getElementById('modal-file-meta').textContent = `${formatBytes(item.size)} • ${item.type || 'Unknown type'} • Added ${new Date(item.createdAt).toLocaleString()}`;
+
+            content.innerHTML = '';
+            const url = URL.createObjectURL(item.blob);
+            activeObjectURLs.push(url);
+
+            if (item.category === 'image') {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = item.name;
+                img.className = 'max-h-[70vh] max-w-full rounded-xl object-contain shadow-lg';
+                content.appendChild(img);
+            } else if (item.category === 'video') {
+                const video = document.createElement('video');
+                video.src = url;
+                video.controls = true;
+                video.autoplay = true;
+                video.className = 'max-h-[70vh] max-w-full rounded-xl shadow-lg bg-black';
+                content.appendChild(video);
+            } else if (item.type.startsWith('audio/')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex flex-col items-center gap-4 p-6 w-full max-w-md';
+                wrapper.innerHTML = `
+                    <div class="w-20 h-20 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                        <i data-lucide="music" class="w-10 h-10"></i>
+                    </div>
+                `;
+                const audio = document.createElement('audio');
+                audio.src = url;
+                audio.controls = true;
+                audio.className = 'w-full';
+                wrapper.appendChild(audio);
+                content.appendChild(wrapper);
+            } else if (item.type === 'application/pdf') {
+                const iframe = document.createElement('iframe');
+                iframe.src = url;
+                iframe.className = 'w-full h-[68vh] rounded-xl border border-slate-800 bg-white';
+                content.appendChild(iframe);
+            } else if (item.type.startsWith('text/') || item.name.endsWith('.json') || item.name.endsWith('.md') || item.name.endsWith('.csv')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const pre = document.createElement('pre');
+                    pre.className = 'w-full max-h-[65vh] overflow-auto p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs sm:text-sm font-mono text-slate-200 whitespace-pre-wrap';
+                    pre.textContent = e.target.result;
+                    content.appendChild(pre);
+                };
+                reader.readAsText(item.blob);
+            } else {
+                content.innerHTML = `
+                    <div class="text-center p-8">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="file-archive" class="w-8 h-8"></i>
+                        </div>
+                        <h4 class="text-base font-medium text-slate-200">No inline preview available</h4>
+                        <p class="text-xs text-slate-400 mt-1 mb-5">Click Download above to export and open this file on your device.</p>
+                    </div>
+                `;
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeMediaModal() {
+            const modal = document.getElementById('media-modal');
+            const content = document.getElementById('modal-content');
+            // Stop any playing audio/video
+            content.querySelectorAll('video, audio').forEach(media => {
+                media.pause();
+                media.src = '';
+            });
+            content.innerHTML = '';
+            currentPreviewItem = null;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function downloadVaultItem(item) {
+            const url = URL.createObjectURL(item.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = item.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast(`Downloading "${item.name}"...`, 'info');
+        }
+
+        // =====================================================================
+        // 5. UTILITY FUNCTIONS (Formatting, Toasts, Confirmation Dialog)
+        // =====================================================================
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getFileIconName(mimeType, fileName) {
+            if (mimeType.startsWith('audio/')) return 'music';
+            if (mimeType === 'application/pdf') return 'file-text';
+            if (mimeType.includes('zip') || mimeType.includes('rar') || fileName.endsWith('.zip')) return 'file-archive';
+            if (mimeType.includes('spreadsheet') || fileName.endsWith('.csv') || fileName.endsWith('.xlsx')) return 'file-spreadsheet';
+            return 'file';
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag]));
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                info: 'bg-slate-900 border-slate-700 text-slate-200',
+                success: 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200',
+                warning: 'bg-amber-950/95 border-amber-500/40 text-amber-200',
+                error: 'bg-rose-950/95 border-rose-500/40 text-rose-200'
+            };
+
+            const icons = {
+                info: 'info',
+                success: 'check-circle-2',
+                warning: 'alert-circle',
+                error: 'x-circle'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium transition-all duration-300 transform translate-y-0 ${colors[type] || colors.info}`;
+            toast.innerHTML = `
+                <i data-lucide="${icons[type] || icons.info}" class="w-4 h-4 shrink-0"></i>
+                <span class="flex-1">${escapeHTML(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function showConfirmDialog(title, message, onConfirm) {
+            const modal = document.getElementById('confirm-modal');
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            const okBtn = document.getElementById('confirm-ok-btn');
+
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                cancelBtn.onclick = null;
+                okBtn.onclick = null;
+            };
+
+            cancelBtn.onclick = cleanup;
+            okBtn.onclick = () => {
+                cleanup();
+                onConfirm();
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    </script>
+</body>
+</html>
